@@ -1,1 +1,5 @@
 *.db
+*_cache
+__pycache__
+dist
+*.egg-info/
