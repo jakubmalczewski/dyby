@@ -5,6 +5,7 @@ import sqlite3
 import hashlib
 BUF_SIZE = 65536
 from collections import namedtuple
+from time import asctime, time_ns
 
 emptyConfig = """
 ---
@@ -27,7 +28,7 @@ class Dyby:
         self.dbPath = str(Path(config["dybypath"] + "/dyby.db").absolute())
 
 
-    def _get_hash_(self, fileName) -> int:
+    def _hash_(self, fileName) -> int:
         md5 = hashlib.md5()
         with open(fileName, "rb") as file:
             while True:
@@ -42,24 +43,25 @@ class Dyby:
         if not name:
             name = fileName.split("/")[-1]
         path = str(Path(fileName).absolute())
-        fileHash = self._get_hash_(fileName)
+        fileHash = self._hash_(fileName)
         if self.is_in(fileName):
             print(f"[dyby] file: {fileName} already in database")
             return None
             
         con = sqlite3.connect(self.dbPath)
         cur = con.cursor()
-        cur.execute("insert into files values (?, ?, ?)", (name, fileHash, path))
+        cur.execute("insert into files values (?, ?, ?, ?, ?)", 
+            (name, fileHash, path, time_ns(), asctime()))
         con.commit()
         con.close()        
-        print(f"[dyby] added record: {(name, fileHash, path)}")
-        #TODO add time stamp
+        print(f"[dyby] added record: {(name, path)}")
 
 
     def is_in(self, fileName : str) -> bool:
         con = sqlite3.connect(self.dbPath)
         cur = con.cursor()
-        cur.execute("SELECT COUNT(*) as count FROM files WHERE hash = (?);", (self._get_hash_(fileName), ))
+        cur.execute("SELECT COUNT(*) as count FROM files WHERE hash = (?);", 
+            (self._hash_(fileName), ))
         result = cur.fetchall()[0][0]
         con.close()
         return result == 1
@@ -120,6 +122,6 @@ def create_db(path : str) -> None:
     con = sqlite3.connect(path)
     cur = con.cursor()
     cur.execute('''CREATE TABLE files
-               (name, hash, path)''')
+               (name, hash, path, time, nicetime)''')
     con.commit()
     con.close()
