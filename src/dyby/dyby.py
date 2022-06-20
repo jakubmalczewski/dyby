@@ -28,22 +28,11 @@ class Dyby:
         self.dbPath = str(Path(config["dybypath"] + "/dyby.db").absolute())
 
 
-    def _hash_(self, fileName) -> int:
-        md5 = hashlib.md5()
-        with open(fileName, "rb") as file:
-            while True:
-                data = file.read(BUF_SIZE)
-                if not data:
-                    break
-                md5.update(data)
-        return str(md5.hexdigest())
-
-
     def add(self, fileName : str, name : str = None) -> None:
         if not name:
             name = fileName.split("/")[-1]
         path = str(Path(fileName).absolute())
-        fileHash = self._hash_(fileName)
+        fileHash = file_hash(fileName)
         if self.is_in(fileName):
             print(f"[dyby] file: {fileName} already in database")
             return None
@@ -56,12 +45,31 @@ class Dyby:
         con.close()        
         print(f"[dyby] added record: {(name, path)}")
 
+    def get(self, fileName : str = None, name : str = None) -> str:
+        if not fileName and not name:
+            return None
+        
+        con = sqlite3.connect(self.dbPath)
+        cur = con.cursor()
+        if fileName == None:
+            cur.execute("SELECT path FROM files WHERE name=(?);", (name,))
+        elif fileName != None and name == None:    
+            cur.execute("SELECT path FROM files WHERE hash=(?);", (file_hash(fileName),))
+        result = cur.fetchall()
+        con.close()
+        print(result)
+            
+        if result == []:
+            print(f"[dyby] file {name if name else fileName} not found")
+            return None
+        
+        return result[0][0]
 
     def is_in(self, fileName : str) -> bool:
         con = sqlite3.connect(self.dbPath)
         cur = con.cursor()
         cur.execute("SELECT COUNT(*) as count FROM files WHERE hash = (?);", 
-            (self._hash_(fileName), ))
+            (file_hash(fileName), ))
         result = cur.fetchall()[0][0]
         con.close()
         return result == 1
@@ -82,6 +90,15 @@ def db(path = './dyby.yaml') -> Dyby:
 
     return Dyby(config)
 
+def file_hash(fileName) -> str:
+    md5 = hashlib.md5()
+    with open(fileName, "rb") as file:
+        while True:
+            data = file.read(BUF_SIZE)
+            if not data:
+                break
+            md5.update(data)
+    return str(md5.hexdigest())
 
 def get_config(path : str) -> dict:
     configPath = Path(path)
@@ -95,11 +112,11 @@ def get_config(path : str) -> dict:
         else:
             raise FileTypeError(f"{path} is not a yaml config file.")
     else:
-        create_config(str(configPath))
+        write_config(str(configPath))
         return get_config(str(configPath))
 
 
-def create_config(path : str) -> None:
+def write_config(path : str) -> None:
     with open(path, 'w') as file:
         file.write(emptyConfig)
 

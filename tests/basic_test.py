@@ -54,7 +54,7 @@ def test_prepare_dyby():
         assert Path("dyby").is_dir()
         con = sqlite3.connect("dyby/dyby.db")
         cur = con.cursor()
-        cur.execute("INSERT INTO files VALUES ('test',1548581324584,'/test')")
+        cur.execute("INSERT INTO files VALUES ('test',1548581324584,'/test',1,1)")
         assert len(list(cur.execute('SELECT * FROM files'))) == 1
         con.close()
 
@@ -74,11 +74,11 @@ def test_add_get_file():
             file.write("42")
         with open("testfile2.txt", "w") as file:
             file.write("84")
-        db.add("testfile1.txt")
-        assert db.count() == 1
-        db.add("testfile1.txt")
-        assert db.count() == 1
         db.add("testfile1.txt", name = "testfile")
+        assert db.count() == 1
+        db.add("testfile1.txt")
+        assert db.count() == 1
+        db.add("testfile1.txt")
         assert db.count() == 1
         db.add("testfile2.txt")
         assert db.count() == 2
@@ -87,12 +87,8 @@ def test_add_get_file():
         db.add("testfile1.txt")
         assert db.count() == 3
         
-        record = db.get(name = "testfile")
-        assert type(record) == dyby.Record
-        assert record.name == "testfile"
-        assert type(record.hash) == str
-        assert type(record.path) == str
-        assert Path(type(record.path)).is_file()
+        assert Path(db.get(name = "testfile")).is_file()
+        assert Path(db.get(fileName = "testfile1.txt")).is_file()
 
 
 if __name__ == "__main__":
