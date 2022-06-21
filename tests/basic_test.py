@@ -74,8 +74,9 @@ def test_add_get_file():
             file.write("42")
         with open("testfile2.txt", "w") as file:
             file.write("84")
-        db.add("testfile1.txt", name = "testfile")
+        db.add("testfile1.txt", tag = "testfile")
         assert db.count() == 1
+        assert Path(db.get(tag = "testfile")).is_file()
         db.add("testfile1.txt")
         assert db.count() == 1
         db.add("testfile1.txt")
@@ -84,12 +85,11 @@ def test_add_get_file():
         assert db.count() == 2
         with open("testfile1.txt", "a") as file:
             file.write("42")
-        db.add("testfile1.txt")
+        db.add("testfile1.txt", tag = "testfile")
         assert db.count() == 3
         
-        assert Path(db.get(name = "testfile")).is_file()
         assert Path(db.get(fileName = "testfile1.txt")).is_file()
-
+        assert len(db.get(tag = "testfile")) == 2
 
 if __name__ == "__main__":
     test_config_is_not_yaml()

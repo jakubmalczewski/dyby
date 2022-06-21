@@ -28,9 +28,9 @@ class Dyby:
         self.dbPath = str(Path(config["dybypath"] + "/dyby.db").absolute())
 
 
-    def add(self, fileName : str, name : str = None) -> None:
-        if not name:
-            name = fileName.split("/")[-1]
+    def add(self, fileName : str, tag : str = None) -> None:
+        if not tag:
+            tag = fileName.split("/")[-1]
         path = str(Path(fileName).absolute())
         fileHash = file_hash(fileName)
         if self.is_in(fileName):
@@ -40,30 +40,33 @@ class Dyby:
         con = sqlite3.connect(self.dbPath)
         cur = con.cursor()
         cur.execute("insert into files values (?, ?, ?, ?, ?)", 
-            (name, fileHash, path, time_ns(), asctime()))
+            (tag, fileHash, path, time_ns(), asctime()))
         con.commit()
         con.close()        
-        print(f"[dyby] added record: {(name, path)}")
+        print(f"[dyby] added record: {(tag, path)}")
 
-    def get(self, fileName : str = None, name : str = None) -> str:
-        if not fileName and not name:
+    def get(self, fileName : str = None, tag : str = None) -> str:
+        if not fileName and not tag:
             return None
         
         con = sqlite3.connect(self.dbPath)
         cur = con.cursor()
         if fileName == None:
-            cur.execute("SELECT path FROM files WHERE name=(?);", (name,))
-        elif fileName != None and name == None:    
+            cur.execute("SELECT path FROM files WHERE name=(?);", (tag,))
+        elif fileName != None and tag == None:    
             cur.execute("SELECT path FROM files WHERE hash=(?);", (file_hash(fileName),))
         result = cur.fetchall()
         con.close()
         print(result)
             
         if result == []:
-            print(f"[dyby] file {name if name else fileName} not found")
+            print(f"[dyby] file {tag if tag else fileName} not found")
             return None
-        
-        return result[0][0]
+        elif len(result) == 1:
+            return result[0][0]
+        else:
+            return [r[0] for r in result]
+
 
     def is_in(self, fileName : str) -> bool:
         con = sqlite3.connect(self.dbPath)
@@ -99,6 +102,7 @@ def file_hash(fileName) -> str:
                 break
             md5.update(data)
     return str(md5.hexdigest())
+
 
 def get_config(path : str) -> dict:
     configPath = Path(path)
