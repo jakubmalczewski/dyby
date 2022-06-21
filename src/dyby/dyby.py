@@ -1,3 +1,4 @@
+from argparse import ArgumentError
 import sys, os
 from pathlib import Path
 import yaml
@@ -6,6 +7,7 @@ import hashlib
 BUF_SIZE = 65536
 from collections import namedtuple
 from time import asctime, time_ns
+import shutil
 
 emptyConfig = """
 ---
@@ -26,13 +28,13 @@ class Dyby:
     def __init__(self, config) -> None:
         self.config = config
         self.dbPath = str(Path(config["dybypath"] + "/dyby.db").absolute())
+        self.storePath = str(Path(config["dybypath"] + "/store/").absolute())
 
-
-    def add(self, fileName : str, tag : str = None) -> None:
+    def add(self, fileName : str, tag : str = None, fileHash : str = None) -> None:
         if not tag:
             tag = fileName.split("/")[-1]
         path = str(Path(fileName).absolute())
-        fileHash = file_hash(fileName)
+        fileHash = fileHash if fileHash else file_hash(fileName)
         if self.is_in(fileName):
             print(f"[dyby] file: {fileName} already in database")
             return None
@@ -44,6 +46,8 @@ class Dyby:
         con.commit()
         con.close()        
         print(f"[dyby] added record: {(tag, path)}")
+        return fileHash
+
 
     def get(self, fileName : str = None, tag : str = None) -> str:
         if not fileName and not tag:
@@ -68,15 +72,17 @@ class Dyby:
             return [r[0] for r in result]
 
 
-    def is_in(self, fileName : str) -> bool:
+    def is_in(self, fileName : str = None, fileHash : str = None) -> bool:
+        if not fileName and not fileHash:
+            return ArgumentError("fileName or fileHash required")
+
         con = sqlite3.connect(self.dbPath)
         cur = con.cursor()
         cur.execute("SELECT COUNT(*) as count FROM files WHERE hash = (?);", 
-            (file_hash(fileName), ))
+            (fileHash if fileHash else file_hash(fileName), ))
         result = cur.fetchall()[0][0]
         con.close()
         return result == 1
-
 
     def count(self,) -> int:
         con = sqlite3.connect(self.dbPath)
@@ -85,6 +91,22 @@ class Dyby:
         result = cur.fetchall()[0][0]
         con.close() 
         return result
+
+    def store_this_file(self,) -> bool:
+        return self.store_file(sys.argv[0])
+
+
+    def store_file(self, fileName : str) -> bool:
+        fileHash = file_hash(fileName)
+        targetPath = f"{self.storePath}/{fileHash}"
+        shutil.copyfile(fileName, targetPath)
+        if Path(targetPath).is_file():
+            self.add(fileName, fileHash = fileHash)
+            if self.is_in(fileHash = fileHash):
+                print(f"[dyby] stored file {fileName}")
+                print(targetPath)
+                return True
+        return False
 
 
 def db(path = './dyby.yaml') -> Dyby:
@@ -131,6 +153,13 @@ def prepare_dyby(path : str) -> None:
         os.mkdir(path)
     elif not path.is_dir():
         raise NotADirectoryError(path) 
+    
+    storePath =  Path(path).joinpath("store")
+    if not storePath.exists():
+        os.mkdir(storePath)
+    elif not storePath.is_dir():
+        raise NotADirectoryError(storePath)
+
     dbpath = Path(path).joinpath("dyby.db").absolute()
     if not dbpath.exists():
         create_db(dbpath)

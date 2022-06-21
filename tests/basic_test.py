@@ -74,8 +74,9 @@ def test_add_get_file():
             file.write("42")
         with open("testfile2.txt", "w") as file:
             file.write("84")
-        db.add("testfile1.txt", tag = "testfile")
+        hash1 = db.add("testfile1.txt", tag = "testfile")
         assert db.count() == 1
+        assert hash1 == dyby.file_hash("testfile1.txt")
         assert Path(db.get(tag = "testfile")).is_file()
         db.add("testfile1.txt")
         assert db.count() == 1
